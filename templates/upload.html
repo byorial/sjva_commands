@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div>
+  <form id='transfer_setting' name='transfer_setting'>
+
+    {{ macros.setting_select_empty('board_type', '게시판', col='6') }}
+    {{ macros.setting_select_empty('category_type', '카테고리', col='6') }}
+    {{ macros.setting_input_text_and_buttons('my_remote_path', 'My 리모트 경로', [['rclone_lsjson_btn', '내용 보기'], ['rclone_size_btn', '크기 확인'], ['btn_remote_path', '폴더검색']], value=arg['defalut_remote_path'], desc=['업로드 할 컨텐츠 폴더']) }}
+    {{ macros.info_text('size_info', '업로드 폴더 정보') }}
+    {{ macros.setting_input_text_and_buttons('folder_name', '폴더명', desc=['시즌1, season 1 과 같은 내용을 특정할 수 없는 폴더명은 수동으로 수정해주세요.']) }}
+
+    {{ macros.m_hr() }}
+
+    {{ macros.setting_input_text_and_buttons('board_title', '제목', [['get_daum_info_btn', 'Daum 정보 확인']], value='') }}
+    {{ macros.setting_input_text_and_buttons('board_daum_url', 'Link URL', [['daum_go_btn', 'Daum Go']], value='') }}
+    <div id="daum_info_div"></div>
+    
+    {{ macros.setting_input_textarea('board_content', '코멘트', value='', row='5', desc=None) }}
+
+    {{ macros.setting_input_hidden('folder_id', '') }}
+    {{ macros.setting_input_hidden('size', '0') }}
+    
+    {{ macros.setting_input_hidden('daum_info', '') }}
+    {{ macros.m_hr() }}
+    {{ macros.setting_button([['do_transfer_btn', 'copy로 실행'], ['do_transfer_move_btn', 'move로 실행(주의)']], left='Action' ) }}
+  </form>
+</div> <!--전체-->
+
+<script type="text/javascript">
+var package_name = 'gd_share_client';
+var sub = 'user';
+var local_path = "{{ arg['local_path'] }}"
+var remote_path = "{{ arg['remote_path'] }}"
+var current_data = null;
+//var current_daum_info = null;
+
+$(document).ready(function(){
+  $.ajax({
+    url: '/' + package_name + '/ajax/'+sub+'/category_list',
+    type: "POST", 
+    cache: false,
+    data: {},
+    dataType: "json",
+    success: function (data) {
+      current_data = data;
+      make_select(data);
+      $('#board_type').change();
+    }
+  });
+});
+
+$('#btn_remote_path').click((evt) => {
+    let add_path = '/';
+    m_select_local_file_modal("경로 선택", local_path, 'true', function(result){
+      var gdpath = result.replace(local_path, remote_path);
+      $('#my_remote_path').val(gdpath);
+    });
+    return false;
+});
+
+function make_select(data) {
+  str = '<select id="board_type" name="board_type" class="form-control form-control-sm">';
+  for(var i in data) {
+    if (i == 0) {
+      str += '<option value="' + data[i].type + '" selected>' + data[i].name + '</option>';
+    } else {
+      str += '<option value="' + data[i].type + '">' + data[i].name + '</option>';
+    }
+  }
+  str += '</select>'
+  document.getElementById("board_type_div").innerHTML = str;
+}
+
+$("body").on('change', '#board_type', function(e){
+  e.preventDefault();
+  board_type = document.getElementById("board_type").value;
+  $("#category_type").empty();
+  str = '<select id="category_type" name="category_type" class="form-control form-control-sm">';
+  for(var i in current_data) {
+    if ( current_data[i].type == board_type) {
+      for( j in current_data[i].category_list) {
+        if (j == 0) {
+          str += '<option value="' + current_data[i].category_list[j] + '" selected>' + current_data[i].category_list[j] + '</option>';
+        } else {
+          str += '<option value="' + current_data[i].category_list[j] + '">' + current_data[i].category_list[j] + '</option>';
+        }
+      }
+      break;
+    }
+  }
+  document.getElementById("category_type_div").innerHTML = str;
+  $('#category_type').change()
+});
+
+
+$("body").on('click', '#rclone_lsjson_btn', function(e) {
+  e.preventDefault();
+  remote_path = document.getElementById('my_remote_path').value;
+  $.ajax({
+    url: '/' + package_name + '/ajax/'+'base'+'/rclone_lsjson',
+    type: "POST", 
+    cache: false,
+    data: {remote_path:remote_path},
+    dataType: "json",
+    success: function (data) {
+      m_modal(data, remote_path);
+    }
+  });
+});
+
+
+$("body").on('click', '#rclone_size_btn', function(e) {
+  e.preventDefault();
+  remote_path = document.getElementById('my_remote_path').value;
+  $.ajax({
+    url: '/' + package_name + '/ajax/'+'base'+'/rclone_size',
+    type: "POST", 
+    cache: false,
+    data: {remote_path:remote_path},
+    dataType: "json",
+    success: function (data) {
+      str = '';
+      try {
+        str += '파일 : ' + data.count + '개 / ' + humanFileSize(data.bytes);
+        if (data.count > 1000) {
+          $.notify('<strong>파일 : '+data.count+'개<br>업로드 최대 파일수는 1,000</strong>', {type: 'warning'});
+        } else {
+          document.getElementById("size").value = '' + data.bytes;
+          tmp = remote_path.split('/');
+          document.getElementById("board_title").value = tmp[tmp.length-1];
+          document.getElementById("folder_name").value = tmp[tmp.length-1];
+        }
+      } catch (e) {
+        str = '실패' + data;
+      }
+      document.getElementById('size_info').innerHTML = str;
+    }
+  });
+});
+
+
+$("body").on('change', '#my_remote_path', function(e){
+  e.preventDefault();
+  document.getElementById("size_info").innerHTML = '';
+  document.getElementById("size").value = '0';
+});
+
+
+$("body").on('click', '#get_daum_info_btn', function(e) {
+  e.preventDefault();
+  board_type = document.getElementById('board_type').value;
+  $.ajax({
+    url: '/' + package_name + '/ajax/'+sub+'/get_daum_info',
+    type: "POST", 
+    cache: false,
+    data: {board_title:document.getElementById('board_title').value, board_type:board_type},
+    dataType: "json",
+    success: function (data) {
+      //m_modal(data);
+      if (data == '') {
+        $.notify('<strong>검색에 실패하셨습니다.</strong>', {type: 'warning'});
+        return
+      }
+      str = '';
+      str += m_row_start();
+      str += m_col(3, '');
+      if (board_type == 'share_movie') {
+        if ( data.more != null) {
+          tmp = '<img src="' + data.more.poster + '" class="img-fluid">'
+          str += m_col(2, tmp);
+        }
+        tmp = '<strong>' + data.title + ' ('+ data.year + ')' + '</strong><br>'
+        tmp += data.more.info + '<br>'
+        str += m_col(4, tmp);
+        document.getElementById('board_daum_url').value = data.daum_url;
+      } else if (board_type == 'share_ktv' || board_type == 'share_ftv') {
+        tmp = '<img src="' + data.poster_url + '" class="img-fluid">'
+        str += m_col(2, tmp);
+        tmp = '<strong>' + data.title + ' ('+ data.genre + ')' + '</strong><br>'
+        tmp += data.summary + '<br>'
+        str += m_col(4, tmp);
+        document.getElementById('board_daum_url').value = data.daum_url;
+      }
+      document.getElementById('daum_info_div').innerHTML = str;
+      //current_daum_info = data
+      document.getElementById('daum_info').value = JSON.stringify(data);
+    }
+  });
+});
+
+$("body").on('click', '#daum_go_btn', function(e) {
+  e.preventDefault();
+  url = document.getElementById('board_daum_url').value;
+  window.open(url, "_blank");
+});
+
+$("body").on('click', '#do_transfer_btn', function(e) {
+  e.preventDefault();
+  size = document.getElementById("size").value;
+  if (size == '0') {
+    $.notify('<strong>"크기 확인" 을 먼저 진행해주세요.</strong>', {type: 'warning'});
+    return;
+  }
+  do_action('upload');
+});
+
+
+$("body").on('click', '#do_transfer_move_btn', function(e) {
+  e.preventDefault();
+  size = document.getElementById("size").value;
+  if (size == '0') {
+    $.notify('<strong>"크기 확인" 을 먼저 진행해주세요.</strong>', {type: 'warning'});
+    return;
+  }
+
+  document.getElementById("confirm_title").innerHTML = "move 명령";
+  document.getElementById("confirm_body").innerHTML = "move 명령을 하면 source에서는 파일이 사라집니다.<br>계속 진행 하시겠습니까?";
+  $('#confirm_button').attr('onclick', "do_action('move');");
+  $("#confirm_modal").modal();
+  return;
+});
+
+
+function do_action(action) {
+  var formData = get_formdata('#transfer_setting')
+  formData += '&action=' + action;
+  $.ajax({
+    url: '/' + package_name + '/ajax/'+sub+'/do_action',
+    type: "POST", 
+    cache: false,
+    data: formData,
+    dataType: "json",
+    success: function (data) {
+      //m_modal(data);
+      command_modal_show('');
+    }
+  });
+}
+
+</script>    
+{% endblock %}
+
