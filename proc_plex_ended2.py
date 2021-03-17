@@ -29,7 +29,7 @@ TARGET = {u'gdrive:/PDS/TV/00.국내TV(방송중)/드라마':u'gdrive:/PDS/TV/01
         #u'gdrive:/PDS/TV/00.국내TV(방송중)/예능':u'gdrive:/PDS/TV/04.국내예능-완결',
 
 # 테스트시 True, 실제실행시 False
-DRYRUN = False
+DRYRUN = True
 
 # 경로변환 규칙: remote경로, Plex서버상의 경로
 REMOTE_PATH_RULE = [u'gdrive:/PDS', u'/mnt/gdrive']
@@ -418,9 +418,14 @@ def main(*args, **kwargs):
     if 'logger' in kwargs:
         logger = kwargs['logger']
         log('=========== SCRIPT START ===========')
-        #log(args)
-        #log(kwargs)
+        rule_list = [x.rule for x in app.url_map.iter_rules()]
+        if (CALLBACK_URI + '/scan_completed') not in rule_list:
+            log(u'콜백등록: {}'.format(CALLBACK_URI+'/scan_completed'))
+            app.register_blueprint(bp)
+            app.add_template_filter(strftime_in_kst)
 
+        run(args)
+        """
         if 'register' in args:
             app.register_blueprint(bp)
             app.add_template_filter(strftime_in_kst)
@@ -428,6 +433,7 @@ def main(*args, **kwargs):
             return
         else:
             run(args)
+        """
         log('=========== SCRIPT END ===========')
     else:
         log('LOAD 스크립트로 실행해 주세요!!!!!!!!!!!!!!!!!!!!!!!!!!')
