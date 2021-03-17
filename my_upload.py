@@ -6,17 +6,10 @@ if __name__ == "__main__":
     sys.setdefaultencoding('utf-8')
 logger = None
 import os, traceback
-import re
-import requests
-import json
 
 # SJVA
 from flask import Blueprint, request, render_template, redirect
 from framework import app, py_urllib
-from system.model import ModelSetting as SystemModelSetting
-from rclone.logic import Logic as LogicRclone
-from lib_gdrive import LibGdrive
-#import gd_share_client
 from gd_share_client.plugin import ModelSetting as GDModelSetting
 
 ##########################################################################################
@@ -24,18 +17,20 @@ from gd_share_client.plugin import ModelSetting as GDModelSetting
 ##########################################################################################
 BASIC_REMOTE = u'gdrive:'
 REMOTE_PATH_RULE = ['gdrive:/PDS', '/mnt/gdrive']
+MY_NAME = 'my_upload'
 MY_URL = '/my_upload'
+MY_TEMPLATE = 'upload.html'
 ##########################################################################################
 
 # global variables
-bp = Blueprint('my_upload', 'my_upload', url_prefix=MY_URL, template_folder=os.path.join(os.path.dirname(__file__), 'templates'))
+bp = Blueprint(MY_NAME, MY_NAME, url_prefix=MY_URL, template_folder=os.path.join(os.path.dirname(__file__), 'templates'))
 
 @bp.route('/', methods=['GET','POST'])
 def my_route():
     arg = GDModelSetting.to_dict()
     arg['remote_path'] = REMOTE_PATH_RULE[0]
     arg['local_path'] = REMOTE_PATH_RULE[1]
-    return render_template('upload.html', arg=arg)
+    return render_template(MY_TEMPLATE, arg=arg)
 
 def strftime_in_kst(datetimeutc, date_format, time_diff=0):
     return (datetimeutc + timedelta(hours=time_diff)).strftime(date_format)
@@ -46,7 +41,6 @@ def run(args):
         if MY_URL not in rule_list:
             log(u'url_map 등록: {}'.format(MY_URL))
             app.register_blueprint(bp)
-            app.add_template_filter(strftime_in_kst)
     except Exception as e:
         log('Exception %s', e)
         log(traceback.format_exc())
