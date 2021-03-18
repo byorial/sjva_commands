@@ -8,14 +8,12 @@ logger = None
 import os, traceback
 
 # SJVA
-from flask import Blueprint, request, render_template, redirect
-from framework import app, py_urllib, path_data, SystemModelSetting
+from flask import Blueprint, render_template
+from framework import app, SystemModelSetting
 
 ##########################################################################################
 # 사용자 설정값
 ##########################################################################################
-BASIC_REMOTE = u'gdrive:'
-REMOTE_PATH_RULE = ['gdrive:/PDS', '/mnt/gdrive']
 MY_NAME = 'my_custom'
 MY_URL = '/my_custom'
 MY_TEMPLATE = 'custom.html'
