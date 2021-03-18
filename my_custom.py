@@ -10,7 +10,6 @@ import os, traceback
 # SJVA
 from flask import Blueprint, request, render_template, redirect
 from framework import app, py_urllib, path_data, SystemModelSetting
-from gd_share_client.plugin import ModelSetting as GDModelSetting
 
 ##########################################################################################
 # 사용자 설정값
@@ -27,7 +26,7 @@ bp = Blueprint(MY_NAME, MY_NAME, url_prefix=MY_URL, template_folder=os.path.join
 
 @bp.route('/', methods=['GET','POST'])
 def my_route():
-    arg = GDModelSetting.to_dict()
+    arg = {}
     arg['package_name'] = 'klive'
     arg['ddns'] = SystemModelSetting.get('ddns')
     arg['auth_use_apikey'] = str(SystemModelSetting.get_bool('auth_use_apikey'))
