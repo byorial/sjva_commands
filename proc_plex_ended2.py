@@ -24,16 +24,19 @@ import plex
 ##########################################################################################
 # 종영처리할 대상경로:종영시 이동 경로
 TARGET = {u'gdrive:/PDS/TV/00.국내TV(방송중)/드라마':u'gdrive:/PDS/TV/01.국내드라마(종영)'}
-#TARGET = {u'gdrive:/PDS/TV/00.국내TV(방송중)/드라마':u'gdrive:/PDS/TV/01.국내드라마(종영)'}
-        #u'gdrive:/PDS/TV/00.국내TV(방송중)/일본드라마':u'gdrive:/PDS/TV/02.해외드라마'}
-        #u'gdrive:/PDS/TV/00.국내TV(방송중)/예능':u'gdrive:/PDS/TV/04.국내예능-완결',
+# 여러개 입력 시 샘플
+"""
+TARGET = {u'gdrive:/PDS/TV/00.국내TV(방송중)/드라마':u'gdrive:/PDS/TV/01.국내드라마(종영)', 
+        u'gdrive:/PDS/TV/00.국내TV(방송중)/일본드라마':u'gdrive:/PDS/TV/02.해외드라마'}
+"""
 
 # 테스트시 True, 실제실행시 False
 DRYRUN = True
 
 # 경로변환 규칙: remote경로, Plex서버상의 경로
-REMOTE_PATH_RULE = [u'gdrive:/PDS', u'/mnt/gdrive']
-#REMOTE_PATH_RULE = [u'gdrive:/PDS', u'P:'] # for window plex 
+REMOTE_PATH_RULE = {u'gdrive:/PDS':u'/mnt/gdrive'}
+#REMOTE_PATH_RULE = {u'gdrive:/PDS':u'P:'} # for window plex 
+#REMOTE_PATH_RULE = {u'gdrive:/PDS':u'/mnt/gdrive', u'tdrive:/PDS':u'/mnt/tdrive'} # 여러개입력시 샘플
 
 # PLEX관련 설정 --------------------------------------------------------------------------
 # 스캔명령 전송 여부: True:스캔명령전송, False: 스캔명령 전송안함
@@ -104,34 +107,28 @@ def init_gdrive():
     remotes = LogicRclone.load_remotes()
 
     for orig,dest in TARGET.items():
-        remote = get_rclone_remote(orig)
-        if remote == None:
-            log(u'처리오류: rclone.conf의 remote 정보를 확인하세요')
-            return False
-
-        if remote['name'] not in services:
-            service = LibGdrive.auth_by_rclone_remote(remote)
-            if services == None:
-                log(u'처리오류: Gdrive API 인증실패- rclone설정을 확인하세요')
+        for rpath in [orig, dest]:
+            remote = get_rclone_remote(rpath)
+            if remote == None:
+                log(u'처리오류: rclone.conf의 remote 정보를 확인하세요')
                 return False
-            log(u'인증성공: Gdrive API 인증완료: remote({})'.format(remote['name']))
-            services[remote['name']] = service
-            
-            if orig not in parents:
-                folder_id = LibGdrive.get_folder_id_by_path(orig, service=service)
-                if folder_id == None:
-                    log(u'처리오류: ORIG(%s) folder_id 획득실패' % orig)
-                    return False
-                parents[orig] = folder_id
-                log(u'폴더정보: ORIG({}) folder_id({})'.format(orig, folder_id))
 
-            if dest not in parents:
-                folder_id = LibGdrive.get_folder_id_by_path(dest, service=service)
-                if folder_id == None:
-                    log(u'처리오류: DEST(%s) folder_id 획득실패' % orig)
+            if remote['name'] not in services:
+                service = LibGdrive.auth_by_rclone_remote(remote)
+                if services == None:
+                    log(u'처리오류: Gdrive API 인증실패- rclone설정을 확인하세요')
                     return False
-                parents[dest] = folder_id
-                log(u'폴더정보: DEST({}) folder_id({})'.format(dest, folder_id))
+                log(u'인증성공: Gdrive API 인증완료: remote({})'.format(remote['name']))
+                services[remote['name']] = service
+
+            if rpath not in parents:
+                if 'team_drive' in remote: folder_id = LibGdrive.get_folder_id_by_path(orig, service=service, teamdrive_id=remote['team_drive'])
+                else: folder_id = LibGdrive.get_folder_id_by_path(orig, service=service)
+                if folder_id == None:
+                    log(u'처리오류: PATH(%s) folder_id 획득실패' % rpath)
+                    return False
+                parents[rpath] = folder_id
+                log(u'폴더정보: PATH({}) folder_id({})'.format(rpath, folder_id))
 
     return True
 
@@ -183,26 +180,28 @@ def get_dest_root(rpath):
         log(traceback.format_exc())
         return None
 
-def get_remote_path(filepath):
+def get_remote_path(plexpath):
     global REMOTE_PATH_RULE
 
-    tmp = REMOTE_PATH_RULE
-    ret = filepath.replace(tmp[1], tmp[0])
-    if filepath[0] != '/':
-        ret = ret.replace('\\', '/')
-    return ret.replace('//', '/').replace('\\\\', '\\')
+    for rpath,ppath in REMOTE_PATH_RULE.items():
+        if plexpath.startswith(ppath):
+            ret = plexpath.replace(ppath, rpath)
+            if plexpath[0] != '/':
+                ret = ret.replace('\\','/')
+            return ret.replace('//', '/').replace('\\\\', '\\')
+    return plexpath
 
-# gdrive:/ --> /mnt/gdrive
-def get_plex_path(remote_path):
+
+def get_plex_path(remotepath):
     global REMOTE_PATH_RULE
-    global PLEX_PATH_RULE
 
-    tmp = REMOTE_PATH_RULE
-    ret = remote_path.replace(tmp[0], tmp[1])
-    if ret[0] != '/':
-        ret = ret.replace('\\', '/')
-    ret = ret.replace('//', '/').replace('\\\\', '\\')
-    return ret
+    for rpath,ppath in REMOTE_PATH_RULE.items():
+        if remotepath.startswith(rpath):
+            ret = remotepath.replace(rpath, ppath)
+            if ret[0] != '/':
+                ret = ret.replace('/','\\')
+            return ret.replace('//', '/').replace('\\\\', '\\')
+    return remotepath
 
 def get_root_path(section_id, location_id):
     query = "select root_path from section_locations where id = {lid} and library_section_id = {sid}".format(lid=location_id, sid=section_id)
