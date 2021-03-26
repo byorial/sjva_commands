@@ -188,10 +188,13 @@ def download_sub(sub_seq, video_path):
     if text.upper().find('</SAMI>') != -1:
         text = text[:text.upper().find('</SAMI>')+len('</SAMI>')]
 
-    if ext == '.smi': texts = get_texts(text)
-    #log(texts)
-    lang = detect(texts)
-    cd = chardet.detect(bytes(texts))
+    if ext == '.smi':
+        lang = detect(get_texts(text))
+        cd = chardet.detect(bytes(texts))
+    else:
+        lang = detect(text)
+        cd = chardet.detect(bytes(text))
+
     encoding = cd['encoding']
     log('자막파일 언어정보: encoding(%s), lang(%s), confidence(%.2f)' % (cd['encoding'], lang, cd['confidence']))
     if korsub_only:
