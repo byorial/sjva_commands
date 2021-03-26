@@ -190,7 +190,7 @@ def download_sub(sub_seq, video_path):
 
     if ext == '.smi':
         lang = detect(get_texts(text))
-        cd = chardet.detect(bytes(texts))
+        cd = chardet.detect(bytes(text))
     else:
         lang = detect(text)
         cd = chardet.detect(bytes(text))
