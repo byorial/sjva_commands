@@ -25,7 +25,6 @@ except ImportError:
     os.system('pip install langdetect')
     from langdetect import detect
 
-
 #####################################################################################
 # 사용자 설정값
 #####################################################################################
@@ -45,7 +44,7 @@ search_rules = [
 # 자막파일을 다운받을 임시 경로: *로컬경로*로 지정, 미지정시 영상폴더로 다운(Remote의 경우 가급적 지정해주세요)
 tmp_sub_path = '/tmp/subs'
 # dry_run: True: 자막다운 O, 파일이동 X, False: 자막다운 O, 파일이동 O
-dry_run = False
+dry_run = True
 # 원본 폴더명 유지 
 use_orig_dname = True
 # 자막파일을 다운받은 경우 이동시 target 경로에 폴더를 만들지 여부 
@@ -54,6 +53,8 @@ create_dir = True
 dir_format = '{title} ({year})'     # '제목 (연도)'
 # 자막파일 언어체크: True - 영어자막은 스킵함
 korsub_only = True
+# 인코딩 오류 파일 예외처리 대상 언어 목록 지정
+except_langs = ['ca']
 # 영상파일 이동후 원래 폴더가 비어있는 경우 삭제여부: 영화가 폴더안에 있는경우만 해당함
 remove_empty_dir = True
 
@@ -76,14 +77,12 @@ def is_exist_sub(fpath):
     return False
 
 def load_videos(target_path):
-    video_exts = ['.mp4', '.mkv', '.avi', '.wmv', '.flv']
-
     file_list = []
     if not os.path.isdir(target_path):
         log(u'대상 폴더가 존재하지 않음:{f}'.format(f=target_path))
     for (path, dir, files) in os.walk(target_path):
         for filename in files:
-            if is_video(filename):
+            if is_video(os.path.join(path,filename)):
                 file_list.append(os.path.join(path, filename))
 
     return file_list
@@ -115,11 +114,26 @@ def get_sub_list(keyword):
     return sub_list
 
 def get_texts(xmldata):
-    root = html.fromstring(xmldata)
-    return root.text_content()
+    import re
+    texts = []
+    for line in xmldata.split('\n'):
+        text = re.sub(r"\<[^()]*\>", u'', line)
+        text = re.sub(r"&nbsp;",u' ',text)
+        if text != "": texts.append(text)
+
+    return u'\n'.join(texts)
+    #root = html.fromstring(xmldata)
+    #return root.text_content()
+
+def conv_encoding(data, new_coding='UTF-8'):
+    coding = chardet.detect(data)['encoding']
+    log("coding: "+coding)
+    if new_coding.upper() != coding.upper():
+        data = unicode(data, coding).encode(new_coding)
+    return data
 
 def download_sub(sub_seq, video_path):
-    global tmp_sub_path, korsub_only
+    global tmp_sub_path, korsub_only, except_langs
 
     sub_url    = 'https://reflat.net/loadFILES?p_seq={sub_seq}'
     down_url   = 'https://sail.reflat.net/api/dwFunc/?l=blog%2F{owner}%2F{floc}&f={title}'
@@ -161,22 +175,12 @@ def download_sub(sub_seq, video_path):
         return spath
 
     log(u'자막파일 다운시도: url(%s)' % (surl))
-    r = requests.get(surl)
+    headers = { 'Accept': 'text/html, */*; q=0.01','User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36'}
+    r = requests.get(surl, headers=headers)
     if r.status_code != 200:
         log(u'자막파일 다운실패: url(%s), code(%d)' % surl, r.status_code)
         return None
-    
-    if ext == '.smi': texts = get_texts(r.text.decode('utf-8'))
-    else: texts = r.text.decode('utf-8')
-    cd = chardet.detect(bytes(texts))
-    lang = detect(unicode(texts))
-    encoding = cd['encoding']
-    log('자막파일 언어정보: encoding(%s), lang(%s), confidence(%.2f)' % (cd['encoding'], lang, cd['confidence']))
-    if korsub_only:
-        if lang != u'ko':
-            log(u'자막파일 스킵처리: 한글자막아님, 언어(%s)' % (lang))
-            return None
-    f = open(spath, mode='wb')
+
     content = r.content
     text = r.text
     if content.upper().find('</SAMI>') != -1:
@@ -184,8 +188,25 @@ def download_sub(sub_seq, video_path):
     if text.upper().find('</SAMI>') != -1:
         text = text[:text.upper().find('</SAMI>')+len('</SAMI>')]
 
+    if ext == '.smi': texts = get_texts(text)
+    #log(texts)
+    lang = detect(texts)
+    cd = chardet.detect(bytes(texts))
+    encoding = cd['encoding']
+    log('자막파일 언어정보: encoding(%s), lang(%s), confidence(%.2f)' % (cd['encoding'], lang, cd['confidence']))
+    if korsub_only:
+        if lang != u'ko':
+            if lang in except_langs:
+                log(u'자막파일 예외처리: 인코딩 강제변환')
+                texts = unicode(content, 'EUC-KR').encode('utf-8')
+            else:
+                log(u'자막파일 스킵처리: 한글자막아님, 언어(%s)' % (lang))
+                return None
+
+    f = open(spath, mode='wb')
     try:
-        if encoding != None: size = f.write(content.decode(encoding).encode('utf-8'))
+        if lang in except_langs: size = f.write(texts)
+        elif encoding != None: size = f.write(content.decode(encoding).encode('utf-8'))
         else: size = f.write(text.encode('utf-8'))
     except UnicodeDecodeError, AttributeError:
         size = f.write(text.encode('utf-8'))
