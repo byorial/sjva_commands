@@ -122,7 +122,7 @@ def init_gdrive():
                 services[remote['name']] = service
 
             if rpath not in parents:
-                if 'team_drive' in remote: folder_id = LibGdrive.get_folder_id_by_path(orig, service=service, teamdrive_id=remote['team_drive'])
+                if 'team_drive' in remote: folder_id = LibGdrive.get_folder_id_by_path(rpath, service=service, teamdrive_id=remote['team_drive'])
                 else: folder_id = LibGdrive.get_folder_id_by_path(orig, service=service)
                 if folder_id == None:
                     log(u'처리오류: PATH(%s) folder_id 획득실패' % rpath)
