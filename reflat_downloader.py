@@ -7,7 +7,7 @@ import os, traceback
 logger = None
 ########################################################################## 이 위 고정
 import requests
-import glob, guessit
+import guessit
 import urllib
 import shutil
 from lxml import html
