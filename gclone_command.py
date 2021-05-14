@@ -29,7 +29,8 @@ gclone_path = ModelSetting.get('gclone_path')
 # ex) ['11111', '22222', u'TV'] -> gc:{11111}|gc{22222}/TV
 # 하위폴더명은 옵션: 없는 경우 생략 u'' 형태로 지정
 job_list = [
-        ['1qfFbzTZjRJ7UBHLtC-RIPvF0BvNTI31N', '124wMe0zU67jOo4scCBevPJiNzgjCrp2j'],
+        ['SRC_FOLDER_ID', 'DST_FOLDER_ID'],
+        ['SRC_FOLDER_ID', 'DST_FOLDER_ID', 'SUBFOLDER'],
     ]
 
 #######################################################################################
