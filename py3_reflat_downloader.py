@@ -16,13 +16,13 @@ from urllib.parse import urlparse, parse_qsl
 try:
     import chardet
 except ImportError:
-    os.system('pip3 install chardet')
+    os.system('pip install chardet')
     import chardet
 
 try:
     from langdetect import detect
 except ImportError:
-    os.system('pip3 install langdetect')
+    os.system('pip install langdetect')
     from langdetect import detect
 
 #####################################################################################
